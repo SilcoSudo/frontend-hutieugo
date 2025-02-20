@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import Navbar from '../components/Navbar';
 
 function PostPage() {
   const { postId } = useParams();
@@ -21,7 +20,6 @@ function PostPage() {
 
   return (
     <div className="min-h-screen bg-blue-50">
-      <Navbar />
       <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg mt-10">
         {post ? (
           <>

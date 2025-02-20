@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import Navbar from '../components/Navbar.js';
 
 function HomePage() {
   const [posts, setPosts] = useState([]);
@@ -19,7 +18,6 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-blue-50">
-      <Navbar />
       <div className="p-6 max-w-3xl mx-auto space-y-6">
         {posts.map(post => (
           <div key={post.id} className="bg-white p-4 rounded-xl shadow-md border-l-4 border-blue-500">

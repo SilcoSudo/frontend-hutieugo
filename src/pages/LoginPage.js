@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../services/api';
-import Navbar from '../components/Navbar';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,7 +20,6 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-blue-50">
-      <Navbar />
       <div className="max-w-md mx-auto p-6 bg-white shadow-md rounded-lg mt-10">
         <h1 className="text-2xl font-bold text-center text-blue-700">Đăng nhập</h1>
         <form onSubmit={handleLogin} className="mt-4">
