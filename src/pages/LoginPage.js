@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/api';
+import { loginUser } from '../services/api';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,7 +10,7 @@ function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const user = await login(email, password);
+      const user = await loginUser(email, password);
       localStorage.setItem('user', JSON.stringify(user));
       navigate('/profile');
     } catch (error) {
