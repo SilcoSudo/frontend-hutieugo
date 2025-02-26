@@ -1,49 +1,73 @@
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { registerUser } from '../services/api';
+import api from '../services/api';
 
-function RegisterPage() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+const RegisterPage = () => {
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    email: '',
+  });
+  const [error, setError] = useState('');
 
-  const handleRegister = async (e) => {
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
-      await registerUser(email, password, name);
-        navigate('/login');
+      const response = await api.post('/api/register', formData);
+      console.log('User registered:', response.data);
+      alert('Registration successful!');
+      // Reset form sau khi đăng ký thành công
+      setFormData({ username: '', password: '', email: '' });
     } catch (error) {
-      console.error('Registration failed', error);
+      console.error('Error registering user:', error.response?.data || error.message);
+      setError(error.response?.data?.message || 'Registration failed. Please try again.');
     }
   };
 
   return (
-    <div>
-      <h1>Đăng ký</h1>
-      <form onSubmit={handleRegister}>
-        <input
-          type="text"
-          placeholder="Tên"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Mật khẩu"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button type="submit">Đăng ký</button>
+    <div className="register-page">
+      <h2>Register</h2>
+      {error && <div style={{ color: 'red' }}>{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Username:</label>
+          <input
+            type="text"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div>
+          <label>Password:</label>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div>
+          <label>Email:</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <button type="submit">Register</button>
       </form>
     </div>
   );
-}
+};
 
 export default RegisterPage;
