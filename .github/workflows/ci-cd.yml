@@ -26,29 +26,24 @@ jobs:
       - name: Run tests
         run: npm test -- --watchAll=false || true
 
-      - name: Save build artifact
-        run: |
-          DISABLE_ESLINT_PLUGIN=true npm run build
-          mkdir -p artifact
-          cp -r . artifact/  # Sao chép toàn bộ mã nguồn vào thư mục artifact
-          mv build artifact/build  # Di chuyển thư mục build vào artifact
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: artifact
-
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout code
+        uses: actions/checkout@v4  # Tải toàn bộ mã nguồn, bao gồm Dockerfile, package.json, package-lock.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: frontend-build
-          path: build
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: DISABLE_ESLINT_PLUGIN=true npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -60,7 +55,6 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Frontend image
-        working-directory: build  # Chạy trong thư mục chứa artifact
         run: |
           docker build -t silcosudo/hutieugo-frontend:latest .
           docker push silcosudo/hutieugo-frontend:latest
