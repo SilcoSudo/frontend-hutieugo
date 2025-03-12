@@ -40,11 +40,17 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # Đảm bảo tải toàn bộ mã nguồn, bao gồm Dockerfile
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
           path: build
+
+      - name: Copy Dockerfile to build directory
+        run: cp Dockerfile build/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -56,6 +62,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Frontend image
+        working-directory: build  # Chạy lệnh docker build trong thư mục /build
         run: |
           docker build -t silcosudo/hutieugo-frontend:latest .
           docker push silcosudo/hutieugo-frontend:latest
@@ -73,6 +80,6 @@ jobs:
             docker rm hutieugo-frontend-1 || true
             docker network create wp-network || true
             docker run -d --name hutieugo-frontend-1 \
-              -p 3000:3000 \
+              -p 3000:80 \  # Sửa cổng từ 3000:3000 thành 3000:80 để khớp với Dockerfile (EXPOSE 80)
               --network wp-network \
               silcosudo/hutieugo-frontend:latest
