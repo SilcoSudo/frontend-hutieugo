@@ -10,15 +10,12 @@ const LoginPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await api.post('/login', {
-                username,
-                password,
-            });
-            localStorage.setItem('token', response.data.token);
+            const response = await api.post('/login', { username, password });
+            localStorage.setItem('token', response.data.token); // Lưu token vào localStorage
             window.location.href = '/'; // Chuyển hướng về trang chủ
         } catch (err) {
             setError('Invalid credentials');
-            console.error('Login error:', err.response || err); // Ghi log lỗi để debug
+            console.error('Login error:', err.response || err);
         }
     };
 
