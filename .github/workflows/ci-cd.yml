@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Hutieugo
+name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
   push:
@@ -31,7 +31,14 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
-      - name: Deploy to VPS
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml for Hutieugo
+        run: |
+          docker compose -f ../../docker-compose.yml config
+
+      - name: Deploy Hutieugo stack to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -41,8 +48,8 @@ jobs:
           script: |
             cd ~/Web
             echo "Pulling latest code from repositories..."
-            git -C backend-hutieugo pull origin master
-            git -C frontend-hutieugo pull origin master
+            git -C backend-hutieugo pull origin master || true
+            git -C frontend-hutieugo pull origin master || true
 
             echo "Stopping old containers..."
             docker compose -f docker-compose.yml down || true
@@ -51,4 +58,47 @@ jobs:
             docker compose -f docker-compose.yml up -d --build
 
             echo "Checking running containers..."
-            docker ps
+            docker compose -f docker-compose.yml ps
+
+      - name: Deploy WordPress stack to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd ~/hutieugo-wordpress
+            echo "Pulling latest code for WordPress..."
+            git pull origin master || true
+
+            echo "Validating docker-compose.yml for WordPress..."
+            docker compose -f docker-compose.yml config
+
+            echo "Waiting for Traefik to be ready..."
+            until docker ps | grep -q web-traefik-1; do
+              echo "Waiting for Traefik to be up..."
+              sleep 5
+            done
+
+            echo "Stopping old containers..."
+            docker compose -f docker-compose.yml down || true
+
+            echo "Building and starting new containers..."
+            docker compose -f docker-compose.yml up -d --build
+
+            echo "Checking running containers..."
+            docker compose -f docker-compose.yml ps
+
+      - name: Send email on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Hutieugo and WordPress Deployment Failed"
+          body: "The deployment failed. Check the logs in GitHub Actions."
+          to: truongquy445@gmail.com
+          from: Hutieugo CI/CD <truongquy445@gmail.com>
