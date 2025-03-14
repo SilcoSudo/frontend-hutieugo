@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for frontend-hutieugo
+name: CI/CD Pipeline for Hutieugo
 
 on:
   push:
@@ -31,19 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout code
+      - name: Checkout Frontend code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build frontend
-        run: DISABLE_ESLINT_PLUGIN=true npm run build
+      - name: Clone Backend code
+        run: git clone https://github.com/SilcoSudo/backend-hutieugo.git
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -53,12 +45,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          logout: true
 
-      - name: Build and push Frontend image
+      - name: Build and push images
         run: |
-          docker build -t quytruong2912/hutieugo-frontend:latest .
-          docker push quytruong2912/hutieugo-frontend:latest
+          docker compose -f docker-compose.yml build
+          docker compose -f docker-compose.yml push
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
@@ -68,11 +59,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            docker pull quytruong2912/hutieugo-frontend:latest
-            docker stop hutieugo-frontend-1 || true
-            docker rm hutieugo-frontend-1 || true
-            docker network create wp-network || true
-            docker run -d --name web-frontend-1 \
-              -p 3000:80 \
-              --network wp-network \
-              quytruong2912/hutieugo-frontend:latest
+            cd ~/Web
+            docker compose -f docker-compose.yml down || true
+            docker compose -f docker-compose.yml pull
+            docker compose -f docker-compose.yml up -d
+            docker ps
