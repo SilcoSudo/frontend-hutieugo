@@ -72,7 +72,7 @@ jobs:
             docker stop hutieugo-frontend-1 || true
             docker rm hutieugo-frontend-1 || true
             docker network create wp-network || true
-            docker run -d --name hutieugo-frontend-1 \
+            docker run -d --name web-frontend-1 \
               -p 3000:80 \
               --network wp-network \
               quytruong2912/hutieugo-frontend:latest
