@@ -31,26 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout Frontend code
-        uses: actions/checkout@v4
-
-      - name: Clone Backend code
-        run: git clone https://github.com/SilcoSudo/backend-hutieugo.git
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push images
-        run: |
-          docker compose -f docker-compose.yml build
-          docker compose -f docker-compose.yml push
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -60,7 +40,15 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd ~/Web
+            echo "Pulling latest code from repositories..."
+            git -C backend-hutieugo pull origin master
+            git -C frontend-hutieugo pull origin master
+
+            echo "Stopping old containers..."
             docker compose -f docker-compose.yml down || true
-            docker compose -f docker-compose.yml pull
-            docker compose -f docker-compose.yml up -d
+
+            echo "Building and starting new containers..."
+            docker compose -f docker-compose.yml up -d --build
+
+            echo "Checking running containers..."
             docker ps
