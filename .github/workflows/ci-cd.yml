@@ -31,13 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Validate docker-compose.yml for Hutieugo
-        run: |
-          docker compose -f ../../docker-compose.yml config
-
       - name: Deploy Hutieugo stack to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -72,8 +65,8 @@ jobs:
             echo "Pulling latest code for WordPress..."
             git pull origin master || true
 
-            echo "Validating docker-compose.yml for WordPress..."
-            docker compose -f docker-compose.yml config
+            echo "Stopping old containers..."
+            docker compose -f docker-compose.yml down || true
 
             echo "Waiting for Traefik to be ready..."
             until docker ps | grep -q web-traefik-1; do
@@ -81,24 +74,8 @@ jobs:
               sleep 5
             done
 
-            echo "Stopping old containers..."
-            docker compose -f docker-compose.yml down || true
-
             echo "Building and starting new containers..."
             docker compose -f docker-compose.yml up -d --build
 
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
-
-      - name: Send email on failure
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Hutieugo and WordPress Deployment Failed"
-          body: "The deployment failed. Check the logs in GitHub Actions."
-          to: truongquy445@gmail.com
-          from: Hutieugo CI/CD <truongquy445@gmail.com>
