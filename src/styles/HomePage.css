@@ -1,0 +1,15 @@
+.homepage {
+    text-align: center; /* Căn giữa nội dung */
+    padding: 50px; /* Khoảng cách bên trong */
+    background-color: #f9f9f9; /* Màu nền */
+}
+
+.homepage h2 {
+    font-size: 2.5em; /* Kích thước chữ */
+    color: #333; /* Màu chữ */
+}
+
+.homepage p {
+    font-size: 1.2em; /* Kích thước chữ */
+    color: #666; /* Màu chữ */
+}

@@ -1,0 +1,28 @@
+.navbar {
+    background-color: #4CAF50; /* Màu nền */
+    color: white; /* Màu chữ */
+    padding: 15px; /* Khoảng cách bên trong */
+    display: flex; /* Sử dụng flexbox */
+    justify-content: space-between; /* Căn giữa */
+    align-items: center; /* Căn giữa theo chiều dọc */
+}
+
+.navbar ul {
+    list-style-type: none; /* Bỏ dấu chấm */
+    margin: 0; /* Bỏ margin */
+    padding: 0; /* Bỏ padding */
+    display: flex; /* Sử dụng flexbox */
+}
+
+.navbar li {
+    margin-left: 20px; /* Khoảng cách giữa các mục */
+}
+
+.navbar a {
+    color: white; /* Màu chữ */
+    text-decoration: none; /* Bỏ gạch chân */
+}
+
+.navbar a:hover {
+    text-decoration: underline; /* Gạch chân khi hover */
+}

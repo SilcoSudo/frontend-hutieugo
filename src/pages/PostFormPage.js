@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import '../styles/PostFormPage.css';
 
 function PostFormPage() {
     const [nickname, setNickname] = useState('');
@@ -33,10 +34,10 @@ function PostFormPage() {
     };
 
     return (
-        <div>
+        <div className="post-form-page">
             <h1>Create a Post</h1>
             <form onSubmit={handleSubmit}>
-                <div>
+                <div className="form-group">
                     <label>Nickname:</label>
                     <input
                         type="text"
@@ -45,7 +46,7 @@ function PostFormPage() {
                         required
                     />
                 </div>
-                <div>
+                <div className="form-group">
                     <label>Content:</label>
                     <textarea
                         value={content}
@@ -56,11 +57,11 @@ function PostFormPage() {
                 <button type="submit">Post</button>
             </form>
             <h2>Posts</h2>
-            <ul>
+            <ul className="post-list">
                 {posts.map((post) => (
-                    <li key={post.id}>
+                    <li key={post.id} className="post-item">
                         <strong>{post.nickname}</strong>: {post.content} <br />
-                        <small>{new Date(post.createdAt).toLocaleString()}</small>
+                        <small className="post-date">{new Date(post.createdAt).toLocaleString()}</small>
                     </li>
                 ))}
             </ul>
