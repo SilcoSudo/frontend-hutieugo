@@ -1,31 +1,39 @@
-// src/pages/HomePage.js
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
 
 function HomePage() {
-  const [posts, setPosts] = useState([]);
+    const [posts, setPosts] = useState([]);
 
-  useEffect(() => {
-    axios.get('http://api.hutieugo.id.vn/api/posts')
-      .then(response => setPosts(response.data))
-      .catch(error => console.error('Error fetching posts:', error));
-  }, []);
+    useEffect(() => {
+        const fetchPosts = async () => {
+            try {
+                const response = await api.get('/api/posts');
+                setPosts(response.data);
+            } catch (error) {
+                console.error('Error fetching posts:', error);
+            }
+        };
+        fetchPosts();
+    }, []);
 
-  return (
-    <div>
-      <h1>Public Posts</h1>
-      <Link to="/post">Create a new post</Link>
-      <ul>
-        {posts.map(post => (
-          <li key={post.id}>
-            <strong>{post.nickname}</strong>: 
-            <Link to={`/post/${post.id}`}>{post.content.substring(0, 50)}...</Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+    return (
+        <div>
+            <h1>Welcome to Hutieugo</h1>
+            <h2>Recent Posts</h2>
+            {posts.length === 0 ? (
+                <p>No posts available.</p>
+            ) : (
+                <ul>
+                    {posts.map((post) => (
+                        <li key={post.id}>
+                            <strong>{post.nickname}</strong>: {post.content} <br />
+                            <small>{new Date(post.createdAt).toLocaleString()}</small>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 export default HomePage;

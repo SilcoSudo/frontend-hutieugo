@@ -1,54 +1,72 @@
-// src/pages/PostFormPage.js
-import React, { useState } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
 
 function PostFormPage() {
-  const [nickname, setNickname] = useState('');
-  const [content, setContent] = useState('');
-  const navigate = useNavigate();
+    const [nickname, setNickname] = useState('');
+    const [content, setContent] = useState('');
+    const [posts, setPosts] = useState([]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!nickname || !content) {
-      alert('Please enter both nickname and content!');
-      return;
-    }
+    // Lấy danh sách bài post khi component mount
+    useEffect(() => {
+        const fetchPosts = async () => {
+            try {
+                const response = await api.get('/api/posts');
+                setPosts(response.data);
+            } catch (error) {
+                console.error('Error fetching posts:', error);
+            }
+        };
+        fetchPosts();
+    }, []);
 
-    axios.post('http://api.hutieugo.id.vn/api/posts', { nickname, content })
-      .then(() => {
-        setNickname('');
-        setContent('');
-        navigate('/'); // Quay về HomePage sau khi đăng
-      })
-      .catch(error => console.error('Error posting:', error));
-  };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await api.post('/api/posts', { nickname, content });
+            setPosts([...posts, response.data]); // Thêm bài post mới vào danh sách
+            setNickname('');
+            setContent('');
+            alert('Post created successfully!');
+        } catch (error) {
+            console.error('Error posting:', error);
+            alert('Failed to create post. Please try again.');
+        }
+    };
 
-  return (
-    <div>
-      <h1>Create a Post</h1>
-      <form onSubmit={handleSubmit}>
+    return (
         <div>
-          <label>Nickname: </label>
-          <input
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="Your nickname"
-          />
+            <h1>Create a Post</h1>
+            <form onSubmit={handleSubmit}>
+                <div>
+                    <label>Nickname:</label>
+                    <input
+                        type="text"
+                        value={nickname}
+                        onChange={(e) => setNickname(e.target.value)}
+                        required
+                    />
+                </div>
+                <div>
+                    <label>Content:</label>
+                    <textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        required
+                    />
+                </div>
+                <button type="submit">Post</button>
+            </form>
+            <h2>Posts</h2>
+            <ul>
+                {posts.map((post) => (
+                    <li key={post.id}>
+                        <strong>{post.nickname}</strong>: {post.content} <br />
+                        <small>{new Date(post.createdAt).toLocaleString()}</small>
+                    </li>
+                ))}
+            </ul>
         </div>
-        <div>
-          <label>Content: </label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Write anything..."
-          />
-        </div>
-        <button type="submit">Post</button>
-      </form>
-    </div>
-  );
+    );
 }
 
 export default PostFormPage;
