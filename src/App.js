@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import PostFormPage from './pages/PostFormPage';
 import Layout from './components/Layout';
-import './styles.css';
+import './styles/styles.css';
 
 function App() {
     return (
