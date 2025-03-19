@@ -6,7 +6,6 @@ function PostFormPage() {
     const [content, setContent] = useState('');
     const [posts, setPosts] = useState([]);
 
-    // Lấy danh sách bài post khi component mount
     useEffect(() => {
         const fetchPosts = async () => {
             try {
@@ -23,7 +22,7 @@ function PostFormPage() {
         e.preventDefault();
         try {
             const response = await api.post('/api/posts', { nickname, content });
-            setPosts([...posts, response.data]); // Thêm bài post mới vào danh sách
+            setPosts([...posts, response.data]);
             setNickname('');
             setContent('');
             alert('Post created successfully!');
