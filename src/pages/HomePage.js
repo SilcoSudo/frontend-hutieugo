@@ -1,35 +1,29 @@
+// src/pages/HomePage.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 function HomePage() {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const response = await axios.get('http://localhost:8080/posts');
-        setPosts(response.data);
-      } catch (error) {
-        console.error('Error fetching posts', error);
-      }
-    };
-    fetchPosts();
+    axios.get('http://api.hutieugo.id.vn/api/posts')
+      .then(response => setPosts(response.data))
+      .catch(error => console.error('Error fetching posts:', error));
   }, []);
 
   return (
-    <div className="min-h-screen bg-blue-50">
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div>
+      <h1>Public Posts</h1>
+      <Link to="/post">Create a new post</Link>
+      <ul>
         {posts.map(post => (
-          <div key={post.id} className="bg-white p-4 rounded-xl shadow-md border-l-4 border-blue-500">
-            <h2 className="text-xl font-semibold text-blue-800">{post.title}</h2>
-            <p className="text-gray-700 mt-2">{post.content}</p>
-            <div className="mt-4 flex space-x-4">
-              <button className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600">❤️ Thả tim</button>
-              <button className="px-4 py-2 bg-blue-400 text-white rounded-lg shadow hover:bg-blue-500">📝 Follow tác giả</button>
-            </div>
-          </div>
+          <li key={post.id}>
+            <strong>{post.nickname}</strong>: 
+            <Link to={`/post/${post.id}`}>{post.content.substring(0, 50)}...</Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

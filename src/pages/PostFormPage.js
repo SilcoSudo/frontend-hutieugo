@@ -1,53 +1,51 @@
+// src/pages/PostFormPage.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 function PostFormPage() {
-  const [title, setTitle] = useState('');
+  const [nickname, setNickname] = useState('');
   const [content, setContent] = useState('');
-  const [image, setImage] = useState(null);
   const navigate = useNavigate();
 
-  const handleImageChange = (e) => {
-    setImage(e.target.files[0]);
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('content', content);
-    if (image) formData.append('image', image);
-
-    try {
-      const response = await axios.post('http://localhost:8080/posts', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      navigate('/profile');
-    } catch (error) {
-      console.error('Error creating post', error);
+    if (!nickname || !content) {
+      alert('Please enter both nickname and content!');
+      return;
     }
+
+    axios.post('http://api.hutieugo.id.vn/api/posts', { nickname, content })
+      .then(() => {
+        setNickname('');
+        setContent('');
+        navigate('/'); // Quay về HomePage sau khi đăng
+      })
+      .catch(error => console.error('Error posting:', error));
   };
 
   return (
     <div>
-      <h1>Tạo bài viết mới</h1>
+      <h1>Create a Post</h1>
       <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Tiêu đề"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          placeholder="Nội dung"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
-        <input type="file" onChange={handleImageChange} />
-        <button type="submit">Đăng bài</button>
+        <div>
+          <label>Nickname: </label>
+          <input
+            type="text"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            placeholder="Your nickname"
+          />
+        </div>
+        <div>
+          <label>Content: </label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Write anything..."
+          />
+        </div>
+        <button type="submit">Post</button>
       </form>
     </div>
   );
