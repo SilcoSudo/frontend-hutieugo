@@ -1,3 +1,103 @@
+# name: CI/CD Pipeline for Hutieugo and WordPress
+
+# on:
+#   push:
+#     branches:
+#       - master
+#   pull_request:
+#     branches:
+#       - master
+
+# jobs:
+#   build-and-test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       # Frontend build and test
+#       - name: Set up Node.js (Frontend)
+#         if: contains(github.repository, 'frontend-hutieugo')
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: '20'
+#       - name: Install dependencies (Frontend)
+#         if: contains(github.repository, 'frontend-hutieugo')
+#         run: npm ci
+#       - name: Run tests (Frontend)
+#         if: contains(github.repository, 'frontend-hutieugo')
+#         run: npm test -- --watchAll=false
+
+#       # Backend build and test
+#       - name: Set up Java (Backend)
+#         if: contains(github.repository, 'backend-hutieugo')
+#         uses: actions/setup-java@v3
+#         with:
+#           java-version: '17'
+#       - name: Build and test (Backend)
+#         if: contains(github.repository, 'backend-hutieugo')
+#         run: ./mvnw clean package
+
+#   deploy:
+#     needs: build-and-test
+#     runs-on: ubuntu-latest
+#     if: github.ref == 'refs/heads/master'
+#     steps:
+#       - name: Deploy Hutieugo stack to VPS
+#         uses: appleboy/ssh-action@master
+#         with:
+#           host: ${{ secrets.VPS_HOST }}
+#           username: ${{ secrets.VPS_USERNAME }}
+#           key: ${{ secrets.VPS_SSH_KEY }}
+#           port: ${{ secrets.VPS_PORT }}
+#           script: |
+#             cd ~/Web
+#             echo "Pulling latest code from repositories..."
+#             if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
+#               git -C frontend-hutieugo pull origin master
+#             fi
+#             if [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
+#               git -C backend-hutieugo pull origin master
+#             fi
+#             echo "Building and starting affected containers..."
+#             if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
+#               docker compose -f docker-compose.yml up -d --build frontend prometheus grafana
+#             elif [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
+#               docker compose -f docker-compose.yml up -d --build backend prometheus grafana
+#             else
+#               docker compose -f docker-compose.yml up -d --build
+#             fi
+#             echo "Checking running containers..."
+#             docker compose -f docker-compose.yml ps
+
+#       - name: Deploy WordPress stack to VPS
+#         if: contains(github.repository, 'hutieugo-wordpress')
+#         uses: appleboy/ssh-action@master
+#         with:
+#           host: ${{ secrets.VPS_HOST }}
+#           username: ${{ secrets.VPS_USERNAME }}
+#           key: ${{ secrets.VPS_SSH_KEY }}
+#           port: ${{ secrets.VPS_PORT }}
+#           script: |
+#             cd ~/hutieugo-wordpress
+#             echo "Pulling latest code for WordPress..."
+#             git pull origin master
+#             echo "Waiting for Traefik to be ready..."
+#             until docker ps | grep -q web-traefik-1; do
+#               echo "Waiting for Traefik to be up..."
+#               sleep 5
+#             done
+#             echo "Building and starting WordPress containers..."
+#             docker compose -f docker-compose.yml up -d --build wordpress
+#             echo "Checking running containers..."
+#             docker compose -f docker-compose.yml ps
+
+
+
+
+
+
+
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -23,9 +123,7 @@ jobs:
           node-version: '20'
       - name: Install dependencies (Frontend)
         if: contains(github.repository, 'frontend-hutieugo')
-        run: |
-          if [ ! -f package-lock.json ]; then npm install; fi
-          npm ci
+        run: npm ci
       - name: Run tests (Frontend)
         if: contains(github.repository, 'frontend-hutieugo')
         run: npm test -- --watchAll=false
@@ -43,38 +141,8 @@ jobs:
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push frontend image
-        if: contains(github.repository, 'frontend-hutieugo')
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-frontend:latest
-
-      - name: Build and push backend image
-        if: contains(github.repository, 'backend-hutieugo')
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-backend:latest
-
       - name: Deploy Hutieugo stack to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -84,15 +152,20 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd ~/Web
-            echo "Pulling latest images..."
+            echo "Pulling latest code from repositories..."
             if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
-              docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-frontend:latest
-              echo "Starting affected containers..."
-              docker compose -f docker-compose.yml up -d frontend prometheus grafana
+              git -C frontend-hutieugo pull origin master
+            fi
+            if [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
+              git -C backend-hutieugo pull origin master
+            fi
+            echo "Building and starting affected containers..."
+            if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
+              docker compose -f docker-compose.yml up -d --build frontend prometheus grafana
             elif [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
-              docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-backend:latest
-              echo "Starting affected containers..."
-              docker compose -f docker-compose.yml up -d backend prometheus grafana
+              docker compose -f docker-compose.yml up -d --build backend prometheus grafana
+            else
+              docker compose -f docker-compose.yml up -d --build
             fi
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
@@ -107,14 +180,14 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd ~/hutieugo-wordpress
-            echo "Pulling latest WordPress image..."
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-wordpress:latest
+            echo "Pulling latest code for WordPress..."
+            git pull origin master
             echo "Waiting for Traefik to be ready..."
             until docker ps | grep -q web-traefik-1; do
               echo "Waiting for Traefik to be up..."
               sleep 5
             done
-            echo "Starting WordPress containers..."
-            docker compose -f docker-compose.yml up -d wordpress
+            echo "Building and starting WordPress containers..."
+            docker compose -f docker-compose.yml up -d --build wordpress
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
