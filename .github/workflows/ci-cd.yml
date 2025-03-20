@@ -198,6 +198,8 @@ on:
   pull_request:
     branches:
       - master
+env:
+  ACTIONS_STEP_DEBUG: true
 
 jobs:
   build-and-test:
@@ -243,8 +245,8 @@ jobs:
       - name: Deploy WordPress stack to VPS
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VPS_HOST }}$$
-          username: ${{ secrets.VPS_USERNAME }}$$
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
