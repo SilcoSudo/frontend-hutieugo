@@ -187,7 +187,6 @@
 #             echo "Checking running containers..."
 #             docker compose -f docker-compose.yml ps
 
-
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -201,12 +200,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    steps:
-
     env:
-  ACTIONS_STEP_DEBUG: true
-  ACTIONS_RUNNER_DEBUG: true
-
+      ACTIONS_STEP_DEBUG: true
+      ACTIONS_RUNNER_DEBUG: true
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -239,7 +236,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - name: Deploy Hutieugo stack to VPS
-        uses: appleboy/ssh-action@v0.1.6  # Sử dụng phiên bản cụ thể
+        uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -258,7 +255,7 @@ jobs:
             docker compose -f docker-compose.yml ps
 
       - name: Deploy WordPress stack to VPS
-        uses: appleboy/ssh-action@v0.1.6  # Sử dụng phiên bản cụ thể
+        uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -271,7 +268,15 @@ jobs:
             echo "Stopping old containers..."
             docker compose -f docker-compose.yml down || true
             echo "Waiting for Traefik to be ready..."
+            timeout=300  # 5 phút
+            start_time=$(date +%s)
             until docker ps | grep -q web-traefik-1; do
+              current_time=$(date +%s)
+              elapsed=$((current_time - start_time))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Error: Timeout waiting for Traefik to be up!"
+                exit 1
+              fi
               echo "Waiting for Traefik to be up..."
               sleep 5
             done
