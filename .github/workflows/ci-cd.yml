@@ -189,8 +189,6 @@
 
 
 
-
-
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -237,7 +235,7 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - name: Deploy Hutieugo stack to VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3  # Sử dụng phiên bản cụ thể
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -264,11 +262,11 @@ jobs:
             docker compose -f docker-compose.yml ps
 
       - name: Deploy WordPress stack to VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3  # Sử dụng phiên bản cụ thể
         with:
-          host: ${{ secrets.VPS_HOST }}$$
-          username: ${{ secrets.VPS_USERNAME }}$$
-          key: ${{ secrets.VPS_SSH_KEY }}$$
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd ~/hutieugo-wordpress
@@ -284,6 +282,6 @@ jobs:
             # Kiểm tra xem container WordPress có chạy không
             if ! docker ps | grep -q hutieugo-wordpress-wordpress-1; then
               echo "Error: WordPress container is not running!"
-              docker logs hutieugo-wordpress-wordpress-1
+              docker logs hutieugo-wordpress-wordpress-1 || echo "No logs available for WordPress container"
               exit 1
             fi
