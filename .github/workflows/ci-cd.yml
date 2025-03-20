@@ -188,7 +188,6 @@
 #             docker compose -f docker-compose.yml ps
 
 
-
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -198,34 +197,49 @@ on:
   pull_request:
     branches:
       - master
-env:
-  ACTIONS_STEP_DEBUG: true
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
+
+    env:
+  ACTIONS_STEP_DEBUG: true
+  ACTIONS_RUNNER_DEBUG: true
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # Frontend build and test
+      - name: Set up Node.js (Frontend)
+        if: contains(github.repository, 'frontend-hutieugo')
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install dependencies
+      - name: Install dependencies (Frontend)
+        if: contains(github.repository, 'frontend-hutieugo')
         run: npm ci
-
-      - name: Run tests
+      - name: Run tests (Frontend)
+        if: contains(github.repository, 'frontend-hutieugo')
         run: npm test -- --watchAll=false || true
+
+      # Backend build and test
+      - name: Set up Java (Backend)
+        if: contains(github.repository, 'backend-hutieugo')
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+      - name: Build and test (Backend)
+        if: contains(github.repository, 'backend-hutieugo')
+        run: ./mvnw clean package
 
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - name: Deploy Hutieugo stack to VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.6  # Sử dụng phiên bản cụ thể
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -242,8 +256,9 @@ jobs:
             docker compose -f docker-compose.yml up -d --build
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
+
       - name: Deploy WordPress stack to VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.6  # Sử dụng phiên bản cụ thể
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -260,7 +275,13 @@ jobs:
               echo "Waiting for Traefik to be up..."
               sleep 5
             done
-            echo "Building and starting new containers..."
-            docker compose -f docker-compose.yml up -d --build
+            echo "Starting WordPress containers..."
+            docker compose -f docker-compose.yml up -d wordpress db redis
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
+            # Kiểm tra xem container WordPress có chạy không
+            if ! docker ps | grep -q hutieugo-wordpress-wordpress-1; then
+              echo "Error: WordPress container is not running!"
+              docker logs hutieugo-wordpress-wordpress-1 || echo "No logs available for WordPress container"
+              exit 1
+            fi
