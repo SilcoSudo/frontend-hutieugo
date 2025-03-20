@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for frontend-hutieugo
+name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
   push:
@@ -15,35 +15,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # Frontend build and test
+      - name: Set up Node.js (Frontend)
+        if: contains(github.repository, 'frontend-hutieugo')
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install dependencies
+      - name: Install dependencies (Frontend)
+        if: contains(github.repository, 'frontend-hutieugo')
         run: npm ci
-
-      - name: Run tests
+      - name: Run tests (Frontend)
+        if: contains(github.repository, 'frontend-hutieugo')
         run: npm test -- --watchAll=false || true
 
-  deploy:
+      # Backend build and test
+      - name: Set up Java (Backend)
+        if: contains(github.repository, 'backend-hutieugo')
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+      - name: Build and test (Backend)
+        if: contains(github.repository, 'backend-hutieugo')
+        run: ./mvnw clean package
+
+  build-and-push:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build frontend
-        run: DISABLE_ESLINT_PLUGIN=true npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -56,10 +56,23 @@ jobs:
           logout: true
 
       - name: Build and push Frontend image
+        if: contains(github.repository, 'frontend-hutieugo')
         run: |
           docker build -t quytruong2912/hutieugo-frontend:latest .
           docker push quytruong2912/hutieugo-frontend:latest
-      - name: Deploy to VPS
+
+      - name: Build and push Backend image
+        if: contains(github.repository, 'backend-hutieugo')
+        run: |
+          docker build -t quytruong2912/hutieugo-backend:latest .
+          docker push quytruong2912/hutieugo-backend:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - name: Deploy Hutieugo stack to VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -67,11 +80,69 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            docker pull quytruong2912/hutieugo-frontend:latest
-            docker stop hutieugo-frontend-1 || true
-            docker rm hutieugo-frontend-1 || true
-            docker network create wp-network || true
-            docker run -d --name web-frontend-1 \
-              -p 3000:80 \
-              --network wp-network \
-              quytruong2912/hutieugo-frontend:latest
+            cd ~/Web
+            echo "Creating Web directory if it doesn't exist..."
+            mkdir -p ~/Web
+            cd ~/Web
+            echo "Cloning frontend-hutieugo if not exists..."
+            if [ ! -d "frontend-hutieugo/.git" ]; then
+              git clone https://github.com/SilcoSudo/frontend-hutieugo.git frontend-hutieugo || { echo "Failed to clone frontend-hutieugo"; exit 1; }
+            fi
+            echo "Cloning backend-hutieugo if not exists..."
+            if [ ! -d "backend-hutieugo/.git" ]; then
+              git clone https://github.com/SilcoSudo/backend-hutieugo.git backend-hutieugo || { echo "Failed to clone backend-hutieugo"; exit 1; }
+            fi
+            echo "Pulling latest code from repositories..."
+            if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
+              cd frontend-hutieugo
+              git pull origin master || { echo "Failed to pull frontend-hutieugo"; exit 1; }
+              cd ..
+            fi
+            if [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
+              cd backend-hutieugo
+              git pull origin master || { echo "Failed to pull backend-hutieugo"; exit 1; }
+              cd ..
+            fi
+            echo "Stopping and removing existing containers..."
+            docker compose -f docker-compose.yml down || { echo "Failed to stop containers"; exit 1; }
+            echo "Pulling latest images..."
+            if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
+              docker pull quytruong2912/hutieugo-frontend:latest || { echo "Failed to pull frontend image"; exit 1; }
+              echo "Starting affected containers..."
+              docker compose -f docker-compose.yml up -d traefik mysql backend frontend prometheus grafana || { echo "Failed to start containers"; exit 1; }
+            elif [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
+              docker pull quytruong2912/hutieugo-backend:latest || { echo "Failed to pull backend image"; exit 1; }
+              echo "Starting affected containers..."
+              docker compose -f docker-compose.yml up -d traefik mysql backend frontend prometheus grafana || { echo "Failed to start containers"; exit 1; }
+            else
+              docker compose -f docker-compose.yml up -d || { echo "Failed to start all containers"; exit 1; }
+            fi
+            echo "Checking running containers..."
+            docker compose -f docker-compose.yml ps
+
+      - name: Deploy WordPress stack to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd ~/hutieugo-wordpress
+            echo "Cloning hutieugo-wordpress if not exists..."
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/SilcoSudo/hutieugo-wordpress.git . || { echo "Failed to clone hutieugo-wordpress"; exit 1; }
+            fi
+            echo "Pulling latest code for WordPress..."
+            git pull origin master || { echo "Failed to pull hutieugo-wordpress"; exit 1; }
+            echo "Stopping and removing existing containers..."
+            docker compose -f docker-compose.yml down || { echo "Failed to stop WordPress containers"; exit 1; }
+            echo "Waiting for Traefik to be ready..."
+            until docker ps | grep -q web-traefik-1; do
+              echo "Waiting for Traefik to be up..."
+              sleep 5
+            done
+            echo "Building and starting WordPress containers..."
+            docker compose -f docker-compose.yml up -d --build wordpress db redis || { echo "Failed to start WordPress containers"; exit 1; }
+            echo "Checking running containers..."
+            docker compose -f docker-compose.yml ps
