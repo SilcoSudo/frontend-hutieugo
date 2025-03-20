@@ -1,4 +1,3 @@
-
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -42,8 +41,20 @@ jobs:
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Deploy Hutieugo stack to VPS
         uses: appleboy/ssh-action@master
         with:
@@ -53,25 +64,24 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd ~/Web
-            echo "Pulling latest code from repositories..."
+            echo "Stopping and removing existing containers..."
+            docker compose -f docker-compose.yml down
+            echo "Pulling latest images..."
             if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
-              git -C frontend-hutieugo pull origin master
-            fi
-            if [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
-              git -C backend-hutieugo pull origin master
-            fi
-            echo "Building and starting affected containers..."
-            if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
-              docker compose -f docker-compose.yml up -d --build frontend prometheus grafana
+              docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-frontend:latest
+              echo "Starting affected containers..."
+              docker compose -f docker-compose.yml up -d frontend prometheus grafana
             elif [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
-              docker compose -f docker-compose.yml up -d --build backend prometheus grafana
+              docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-backend:latest
+              echo "Starting affected containers..."
+              docker compose -f docker-compose.yml up -d backend prometheus grafana
             else
-              docker compose -f docker-compose.yml up -d --build
+              docker compose -f docker-compose.yml up -d
             fi
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
+
       - name: Deploy WordPress stack to VPS
-        if: contains(github.repository, 'hutieugo-wordpress')
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -80,14 +90,16 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd ~/hutieugo-wordpress
-            echo "Pulling latest code for WordPress..."
-            git pull origin master
-            echo "Waiting for Traefik to be ready..."
+            echo "Stopping and removing existing containers..."
+            docker compose -f docker-compose.yml down
+            echo "Ensuring Traefik is running..."
             until docker ps | grep -q web-traefik-1; do
               echo "Waiting for Traefik to be up..."
               sleep 5
             done
-            echo "Building and starting WordPress containers..."
-            docker compose -f docker-compose.yml up -d --build wordpress
+            echo "Pulling latest WordPress image..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hutieugo-wordpress:latest || { echo "Failed to pull WordPress image"; exit 1; }
+            echo "Starting WordPress containers..."
+            docker compose -f docker-compose.yml up -d wordpress db redis
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
