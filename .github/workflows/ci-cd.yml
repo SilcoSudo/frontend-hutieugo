@@ -38,26 +38,65 @@ jobs:
         if: contains(github.repository, 'backend-hutieugo')
         run: ./mvnw clean package
 
-  deploy:
+  deploy-hutieugo:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
+      - name: Check GitHub Secrets
+        run: |
+          echo "Checking if secrets are set..."
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then
+            echo "Error: VPS_HOST is not set!"
+            exit 1
+          else
+            echo "VPS_HOST is set (value is hidden: ${{ secrets.VPS_HOST }})"
+          fi
+          if [ -z "${{ secrets.VPS_USERNAME }}" ]; then
+            echo "Error: VPS_USERNAME is not set!"
+            exit 1
+          else
+            echo "VPS_USERNAME is set (value is hidden: ${{ secrets.VPS_USERNAME }})"
+          fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "Error: VPS_SSH_KEY is not set!"
+            exit 1
+          else
+            echo "VPS_SSH_KEY is set (value is hidden: ${{ secrets.VPS_SSH_KEY }})"
+          fi
+          if [ -z "${{ secrets.VPS_PORT }}" ]; then
+            echo "Error: VPS_PORT is not set!"
+            exit 1
+          else
+            echo "VPS_PORT is set (value is hidden: ${{ secrets.VPS_PORT }})"
+          fi
+
       - name: Deploy Hutieugo stack to VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            # Debug: In các biến môi trường do appleboy/ssh-action thiết lập
+            echo "Debug: SSH_HOST=$SSH_HOST"
+            echo "Debug: SSH_USER=$SSH_USER"
+            echo "Debug: SSH_PORT=$SSH_PORT"
+            # Lưu ý: SSH_KEY sẽ không được in vì lý do bảo mật
+
+            # Debug: Kiểm tra kết nối SSH
+            echo "Debug: Testing SSH connection..."
+            hostname  # In tên của server để xác nhận kết nối thành công
+
+            # Tiếp tục script deploy
             cd ~/Web
             echo "Pulling latest code from repositories..."
             if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
-              git -C frontend-hutieugo pull origin master
+              git -C frontend-hutieugo pull origin master || true
             fi
             if [[ "${{ github.repository }}" =~ "backend-hutieugo" ]]; then
-              git -C backend-hutieugo pull origin master
+              git -C backend-hutieugo pull origin master || true
             fi
             echo "Building and starting affected containers..."
             if [[ "${{ github.repository }}" =~ "frontend-hutieugo" ]]; then
@@ -69,24 +108,91 @@ jobs:
             fi
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
+
+  deploy-wordpress:
+    needs: deploy-hutieugo
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && contains(github.repository, 'hutieugo-wordpress')
+    steps:
+      - name: Check GitHub Secrets
+        run: |
+          echo "Checking if secrets are set..."
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then
+            echo "Error: VPS_HOST is not set!"
+            exit 1
+          else
+            echo "VPS_HOST is set (value is hidden: ${{ secrets.VPS_HOST }})"
+          fi
+          if [ -z "${{ secrets.VPS_USERNAME }}" ]; then
+            echo "Error: VPS_USERNAME is not set!"
+            exit 1
+          else
+            echo "VPS_USERNAME is set (value is hidden: ${{ secrets.VPS_USERNAME }})"
+          fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "Error: VPS_SSH_KEY is not set!"
+            exit 1
+          else
+            echo "VPS_SSH_KEY is set (value is hidden: ${{ secrets.VPS_SSH_KEY }})"
+          fi
+          if [ -z "${{ secrets.VPS_PORT }}" ]; then
+            echo "Error: VPS_PORT is not set!"
+            exit 1
+          else
+            echo "VPS_PORT is set (value is hidden: ${{ secrets.VPS_PORT }})"
+          fi
+
       - name: Deploy WordPress stack to VPS
-        if: contains(github.repository, 'hutieugo-wordpress')
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            # Debug: In các biến môi trường do appleboy/ssh-action thiết lập
+            echo "Debug: SSH_HOST=$SSH_HOST"
+            echo "Debug: SSH_USER=$SSH_USER"
+            echo "Debug: SSH_PORT=$SSH_PORT"
+            # Lưu ý: SSH_KEY sẽ không được in vì lý do bảo mật
+
+            # Debug: Kiểm tra kết nối SSH
+            echo "Debug: Testing SSH connection..."
+            hostname  # In tên của server để xác nhận kết nối thành công
+
+            # Kiểm tra xem image quytruong2912/hutieugo-wordpress:latest có tồn tại không
+            echo "Checking if WordPress image exists..."
+            if ! docker pull quytruong2912/hutieugo-wordpress:latest; then
+              echo "Error: Failed to pull quytruong2912/hutieugo-wordpress:latest. Please ensure the image exists on Docker Hub."
+              exit 1
+            fi
+
+            # Tiếp tục script deploy
             cd ~/hutieugo-wordpress
             echo "Pulling latest code for WordPress..."
-            git pull origin master
+            git pull origin master || true
+            echo "Stopping old containers..."
+            docker compose -f docker-compose.yml down || true
             echo "Waiting for Traefik to be ready..."
+            timeout=300  # 5 phút
+            start_time=$(date +%s)
             until docker ps | grep -q web-traefik-1; do
+              current_time=$(date +%s)
+              elapsed=$((current_time - start_time))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Error: Timeout waiting for Traefik to be up!"
+                exit 1
+              fi
               echo "Waiting for Traefik to be up..."
               sleep 5
             done
-            echo "Building and starting WordPress containers..."
-            docker compose -f docker-compose.yml up -d --build wordpress
+            echo "Starting WordPress containers..."
+            docker compose -f docker-compose.yml up -d wordpress db redis
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
+            # Kiểm tra xem container WordPress có chạy không
+            if ! docker ps | grep -q hutieugo-wordpress-wordpress-1; then
+              echo "Error: WordPress container is not running!"
+              docker logs hutieugo-wordpress-wordpress-1 || echo "No logs available for WordPress container"
+              exit 1
+            fi
