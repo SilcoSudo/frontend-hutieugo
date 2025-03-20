@@ -187,6 +187,9 @@
 #             echo "Checking running containers..."
 #             docker compose -f docker-compose.yml ps
 
+
+
+
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -235,8 +238,38 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
+      - name: Check GitHub Secrets
+        run: |
+          echo "Checking if secrets are set..."
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then
+            echo "Error: VPS_HOST is not set!"
+            exit 1
+          else
+            echo "VPS_HOST is set (value is hidden: ${{ secrets.VPS_HOST }})"
+          fi
+          if [ -z "${{ secrets.VPS_USERNAME }}" ]; then
+            echo "Error: VPS_USERNAME is not set!"
+            exit 1
+          else
+            echo "VPS_USERNAME is set (value is hidden: ${{ secrets.VPS_USERNAME }})"
+          fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "Error: VPS_SSH_KEY is not set!"
+            exit 1
+          else
+            echo "VPS_SSH_KEY is set (value is hidden: ${{ secrets.VPS_SSH_KEY }})"
+          fi
+          if [ -z "${{ secrets.VPS_PORT }}" ]; then
+            echo "Error: VPS_PORT is not set!"
+            exit 1
+          else
+            echo "VPS_PORT is set (value is hidden: ${{ secrets.VPS_PORT }})"
+          fi
+
       - name: Deploy Hutieugo stack to VPS
         uses: appleboy/ssh-action@v0.1.6
+        env:
+          REPOSITORY: ${{ github.repository }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -245,12 +278,22 @@ jobs:
           script: |
             cd ~/Web
             echo "Pulling latest code from repositories..."
-            git -C backend-hutieugo pull origin master || true
-            git -C frontend-hutieugo pull origin master || true
+            if [[ "$REPOSITORY" =~ "frontend-hutieugo" ]]; then
+              git -C frontend-hutieugo pull origin master || true
+            fi
+            if [[ "$REPOSITORY" =~ "backend-hutieugo" ]]; then
+              git -C backend-hutieugo pull origin master || true
+            fi
             echo "Stopping old containers..."
             docker compose -f docker-compose.yml down || true
             echo "Building and starting new containers..."
-            docker compose -f docker-compose.yml up -d --build
+            if [[ "$REPOSITORY" =~ "frontend-hutieugo" ]]; then
+              docker compose -f docker-compose.yml up -d --build frontend prometheus grafana
+            elif [[ "$REPOSITORY" =~ "backend-hutieugo" ]]; then
+              docker compose -f docker-compose.yml up -d --build backend prometheus grafana
+            else
+              docker compose -f docker-compose.yml up -d --build
+            fi
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
 
