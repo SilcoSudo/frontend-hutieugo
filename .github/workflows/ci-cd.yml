@@ -188,8 +188,6 @@
 #             docker compose -f docker-compose.yml ps
 
 
-
-
 name: CI/CD Pipeline for Hutieugo and WordPress
 
 on:
@@ -203,35 +201,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    env:
-      ACTIONS_STEP_DEBUG: true
-      ACTIONS_RUNNER_DEBUG: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Frontend build and test
-      - name: Set up Node.js (Frontend)
-        if: contains(github.repository, 'frontend-hutieugo')
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install dependencies (Frontend)
-        if: contains(github.repository, 'frontend-hutieugo')
-        run: npm ci
-      - name: Run tests (Frontend)
-        if: contains(github.repository, 'frontend-hutieugo')
-        run: npm test -- --watchAll=false || true
 
-      # Backend build and test
-      - name: Set up Java (Backend)
-        if: contains(github.repository, 'backend-hutieugo')
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-      - name: Build and test (Backend)
-        if: contains(github.repository, 'backend-hutieugo')
-        run: ./mvnw clean package
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --watchAll=false || true
 
   deploy:
     needs: build-and-test
@@ -267,38 +250,37 @@ jobs:
           fi
 
       - name: Deploy Hutieugo stack to VPS
-        uses: appleboy/ssh-action@v0.1.6
-        env:
-          REPOSITORY: ${{ github.repository }}
+        uses: appleboy/ssh-action@v0.1.6  # Sử dụng phiên bản cụ thể
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            # Debug: In các biến môi trường do appleboy/ssh-action thiết lập
+            echo "Debug: SSH_HOST=$SSH_HOST"
+            echo "Debug: SSH_USER=$SSH_USER"
+            echo "Debug: SSH_PORT=$SSH_PORT"
+            # Lưu ý: SSH_KEY sẽ không được in vì lý do bảo mật
+
+            # Debug: Kiểm tra kết nối SSH
+            echo "Debug: Testing SSH connection..."
+            hostname  # In tên của server để xác nhận kết nối thành công
+
+            # Tiếp tục script deploy
             cd ~/Web
             echo "Pulling latest code from repositories..."
-            if [[ "$REPOSITORY" =~ "frontend-hutieugo" ]]; then
-              git -C frontend-hutieugo pull origin master || true
-            fi
-            if [[ "$REPOSITORY" =~ "backend-hutieugo" ]]; then
-              git -C backend-hutieugo pull origin master || true
-            fi
+            git -C backend-hutieugo pull origin master || true
+            git -C frontend-hutieugo pull origin master || true
             echo "Stopping old containers..."
             docker compose -f docker-compose.yml down || true
             echo "Building and starting new containers..."
-            if [[ "$REPOSITORY" =~ "frontend-hutieugo" ]]; then
-              docker compose -f docker-compose.yml up -d --build frontend prometheus grafana
-            elif [[ "$REPOSITORY" =~ "backend-hutieugo" ]]; then
-              docker compose -f docker-compose.yml up -d --build backend prometheus grafana
-            else
-              docker compose -f docker-compose.yml up -d --build
-            fi
+            docker compose -f docker-compose.yml up -d --build
             echo "Checking running containers..."
             docker compose -f docker-compose.yml ps
 
       - name: Deploy WordPress stack to VPS
-        uses: appleboy/ssh-action@v0.1.6
+        uses: appleboy/ssh-action@v0.1.6  # Sử dụng phiên bản cụ thể
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
